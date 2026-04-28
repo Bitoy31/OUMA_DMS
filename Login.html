@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OUMA DMS - Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    /* ============================================================
+       CSS VARIABLES
+       ============================================================ */
+    :root {
+      --navy:         #0f2346;
+      --navy-mid:     #1a3566;
+      --navy-light:   #243f7a;
+      --gold:         #c8922a;
+      --gold-light:   #e0ac50;
+      --gold-subtle:  rgba(200,146,42,0.12);
+      --white:        #ffffff;
+      --off-white:    #f7f8fc;
+      --surface:      #ffffff;
+      --surface-2:    #f4f6fb;
+      --border:       #dce2ef;
+      --border-light: #edf0f7;
+      --text-1:       #0d1b36;
+      --text-2:       #3d4f6e;
+      --text-3:       #7a8fb5;
+      --text-4:       #aab8d4;
+      --blue:         #2563eb;
+      --blue-light:   rgba(37,99,235,0.1);
+      --red:          #dc2626;
+      --red-light:    rgba(220,38,38,0.1);
+      --shadow-sm:    0 1px 3px rgba(15,35,70,0.06), 0 1px 2px rgba(15,35,70,0.04);
+      --shadow-md:    0 4px 12px rgba(15,35,70,0.10), 0 2px 4px rgba(15,35,70,0.06);
+      --shadow-lg:    0 12px 32px rgba(15,35,70,0.14), 0 4px 8px rgba(15,35,70,0.08);
+      --font:         'DM Sans', sans-serif;
+      --t-fast:       0.15s ease;
+      --t-base:       0.25s ease;
+    }
+
+    /* ============================================================
+       RESET & BASE
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: var(--font); font-size: 14px; color: var(--text-1); background: var(--off-white); }
+
+    /* ============================================================
+       LOGIN CONTAINER
+       ============================================================ */
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -10%;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: rgba(200,146,42,0.08);
+      pointer-events: none;
+    }
+
+    body::after {
+      content: '';
+      position: absolute;
+      bottom: -30%;
+      left: -5%;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.03);
+      pointer-events: none;
+    }
+
+    .login-wrapper {
+      position: relative;
+      z-index: 10;
+      width: 100%;
+      max-width: 420px;
+      padding: 20px;
+    }
+
+    .login-card {
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: var(--shadow-lg);
+      animation: slideUp 0.6s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+
+    .login-logo {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      background: linear-gradient(135deg, var(--gold), var(--gold-light));
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: white;
+      box-shadow: 0 8px 24px rgba(200,146,42,0.3);
+    }
+
+    .login-logo img {
+      width: 100%;
+      height: 100%;
+      border-radius: 16px;
+    }
+
+    .login-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-1);
+      margin-bottom: 8px;
+    }
+
+    .login-subtitle {
+      font-size: 13px;
+      color: var(--text-3);
+    }
+
+    /* ============================================================
+       FORM
+       ============================================================ */
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .form-input {
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-family: var(--font);
+      font-size: 13px;
+      color: var(--text-1);
+      background: var(--surface);
+      outline: none;
+      transition: all var(--t-fast);
+    }
+
+    .form-input:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 3px rgba(15,35,70,0.08);
+    }
+
+    .form-input::placeholder {
+      color: var(--text-4);
+    }
+
+    .form-input.error {
+      border-color: var(--red);
+      background: var(--red-light);
+    }
+
+    /* ============================================================
+       REMEMBER & FORGOT
+       ============================================================ */
+    .form-options {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+    }
+
+    .checkbox-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .checkbox-input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--navy);
+      cursor: pointer;
+    }
+
+    .checkbox-label {
+      color: var(--text-2);
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .forgot-link {
+      color: var(--blue);
+      text-decoration: none;
+      font-weight: 500;
+      transition: opacity var(--t-fast);
+    }
+
+    .forgot-link:hover {
+      opacity: 0.7;
+    }
+
+    /* ============================================================
+       BUTTONS
+       ============================================================ */
+    .login-btn {
+      padding: 12px 16px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--navy), var(--navy-mid));
+      color: white;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all var(--t-fast);
+      margin-top: 8px;
+    }
+
+    .login-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(15,35,70,0.25);
+    }
+
+    .login-btn:active {
+      transform: scale(0.98);
+    }
+
+    .login-btn.loading {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .login-btn i {
+      font-size: 14px;
+    }
+
+    /* ============================================================
+       ERROR MESSAGE
+       ============================================================ */
+    .error-message {
+      display: none;
+      padding: 12px 14px;
+      background: var(--red-light);
+      border: 1px solid rgba(220,38,38,0.2);
+      border-radius: 10px;
+      font-size: 12px;
+      color: var(--red);
+      animation: slideDown 0.3s ease;
+    }
+
+    .error-message.show {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ============================================================
+       DIVIDER
+       ============================================================ */
+    .login-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 24px 0;
+      font-size: 12px;
+      color: var(--text-4);
+    }
+
+    .login-divider::before,
+    .login-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ============================================================
+       DEMO CREDENTIALS
+       ============================================================ */
+    .demo-section {
+      display: none;
+      background: var(--gold-subtle);
+      border: 1px solid rgba(200,146,42,0.2);
+      border-radius: 10px;
+      padding: 14px;
+      margin-top: 20px;
+    }
+
+    .demo-section.show {
+      display: block;
+      animation: slideDown 0.3s ease;
+    }
+
+    .demo-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-2);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 10px;
+    }
+
+    .demo-credentials {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 11px;
+    }
+
+    .demo-cred {
+      background: white;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-light);
+      cursor: pointer;
+      transition: all var(--t-fast);
+    }
+
+    .demo-cred:hover {
+      border-color: var(--gold);
+      background: var(--gold-subtle);
+    }
+
+    .demo-cred-role {
+      font-size: 10px;
+      color: var(--text-3);
+      margin-bottom: 2px;
+    }
+
+    .demo-cred-email {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-1);
+      word-break: break-word;
+    }
+
+    /* ============================================================
+       RESPONSIVE
+       ============================================================ */
+    @media (max-width: 480px) {
+      .login-card {
+        padding: 30px 20px;
+      }
+
+      .login-title {
+        font-size: 20px;
+      }
+
+      .demo-credentials {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="login-wrapper">
+  <div class="login-card">
+    <!-- HEADER -->
+    <div class="login-header">
+      <div class="login-logo">
+        <i class="bi bi-shield-check"></i>
+      </div>
+      <h1 class="login-title">OUMA DMS</h1>
+      <p class="login-subtitle">Document Management System</p>
+    </div>
+
+    <!-- ERROR MESSAGE -->
+    <div class="error-message" id="errorMessage">
+      <i class="bi bi-exclamation-circle-fill"></i>
+      <span id="errorText"></span>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <form class="login-form" id="loginForm" onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input
+          type="email"
+          class="form-input"
+          id="emailInput"
+          placeholder="Enter your email"
+          required
+          autocomplete="email"
+        />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input
+          type="password"
+          class="form-input"
+          id="passwordInput"
+          placeholder="Enter your password"
+          required
+          autocomplete="current-password"
+        />
+      </div>
+
+      <div class="form-options">
+        <label class="checkbox-wrap">
+          <input type="checkbox" class="checkbox-input" id="rememberMe" />
+          <span class="checkbox-label">Remember me</span>
+        </label>
+        <a href="#" class="forgot-link">Forgot password?</a>
+      </div>
+
+      <button type="submit" class="login-btn" id="loginBtn">
+        <i class="bi bi-box-arrow-in-right"></i>
+        <span id="btnText">Sign In</span>
+      </button>
+    </form>
+
+    <!-- DIVIDER -->
+    <div class="login-divider">or</div>
+
+    <!-- DEMO CREDENTIALS TOGGLE -->
+    <button
+      type="button"
+      class="login-btn"
+      style="background: var(--gold-subtle); color: var(--gold); border: 1px solid rgba(200,146,42,0.2); margin: 0;"
+      onclick="toggleDemoCredentials()"
+    >
+      <i class="bi bi-info-circle"></i>
+      Demo Credentials
+    </button>
+
+    <!-- DEMO CREDENTIALS -->
+    <div class="demo-section" id="demoSection">
+      <div class="demo-title">Quick Access - Demo Accounts</div>
+      <div class="demo-credentials" id="demoCredentials">
+        <!-- Populated by JavaScript -->
+      </div>
+      <p style="font-size: 11px; color: var(--text-3); margin-top: 10px;">
+        <i class="bi bi-lightbulb"></i>
+        Click a credential card to auto-fill the form (password: 123)
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toastContainer" style="position: fixed; bottom: 24px; right: 24px; z-index: 2000; display: flex; flex-direction: column; gap: 8px;"></div>
+
+<script>
+  // Demo users by role
+  const DEMO_USERS = {
+    'Administrator': { email: 'ouma.asu@dfa.gov.ph', role: 'Administrator' },
+    'Desk Officer (DIV I)': { email: 'deskofficer1@dfa.gov.ph', role: 'Desk Officer' },
+    'Director (DIV I)': { email: 'director1@dfa.gov.ph', role: 'Directors' },
+    'Deputy Assistant Secretary': { email: 'das@dfa.gov.ph', role: 'Deputy Assistant Secretary (DAS)' },
+    'Assistant Secretary': { email: 'assec@dfa.gov.ph', role: 'Assistant Secretary (AsSec)' },
+    'Under Secretary': { email: 'usec@dfa.gov.ph', role: 'Under Secretary (USec)' },
+    'Communication Officer': { email: 'comms1@dfa.gov.ph', role: 'Communication Officer' },
+    'Secretary': { email: 'sec@dfa.gov.ph', role: 'Secretary' }
+  };
+
+  // Populate demo credentials
+  function populateDemoCredentials() {
+    const container = document.getElementById('demoCredentials');
+    container.innerHTML = Object.entries(DEMO_USERS).map(([label, { email }]) => `
+      <div class="demo-cred" onclick="autofillDemo('${email}')">
+        <div class="demo-cred-role">${label}</div>
+        <div class="demo-cred-email">${email}</div>
+      </div>
+    `).join('');
+  }
+
+  // Initialize
+  document.addEventListener('DOMContentLoaded', () => {
+    populateDemoCredentials();
+    loadRememberedEmail();
+  });
+
+  // Toggle demo credentials section
+  function toggleDemoCredentials() {
+    document.getElementById('demoSection').classList.toggle('show');
+  }
+
+  // Autofill demo credentials
+  function autofillDemo(email) {
+    document.getElementById('emailInput').value = email;
+    document.getElementById('passwordInput').value = '123';
+    document.getElementById('passwordInput').focus();
+  }
+
+  // Load remembered email
+  function loadRememberedEmail() {
+    const remembered = localStorage.getItem('ouma_remembered_email');
+    if (remembered) {
+      document.getElementById('emailInput').value = remembered;
+      document.getElementById('rememberMe').checked = true;
+    }
+  }
+
+  // Handle login
+  function handleLogin(event) {
+    event.preventDefault();
+    
+    const email = document.getElementById('emailInput').value.trim();
+    const password = document.getElementById('passwordInput').value;
+    const rememberMe = document.getElementById('rememberMe').checked;
+    
+    if (!email || !password) {
+      showError('Please enter both email and password');
+      return;
+    }
+
+    const loginBtn = document.getElementById('loginBtn');
+    const btnText = document.getElementById('btnText');
+    loginBtn.disabled = true;
+    loginBtn.classList.add('loading');
+    btnText.textContent = 'Signing in...';
+
+    // Remember email
+    if (rememberMe) {
+      localStorage.setItem('ouma_remembered_email', email);
+    } else {
+      localStorage.removeItem('ouma_remembered_email');
+    }
+
+    // Call server-side authentication
+    google.script.run
+      .withSuccessHandler(onLoginSuccess)
+      .withFailureHandler(onLoginFailure)
+      .authenticateUser(email, password);
+  }
+
+  function onLoginSuccess(result) {
+    const loginBtn = document.getElementById('loginBtn');
+    const btnText = document.getElementById('btnText');
+    
+    if (result.success) {
+      btnText.textContent = 'Success! Loading...';
+      
+      // Store user data for client-side access
+      localStorage.setItem('ouma_user', JSON.stringify(result.user));
+      
+      // Redirect to main app after a short delay
+      setTimeout(() => {
+        // Get the current script URL and redirect to it
+        // This will trigger doGet() which will now serve Index.html because session exists
+        window.top.location.href = window.location.href.split('?')[0];
+      }, 500);
+    } else {
+      showError(result.error || result.message || 'Authentication failed');
+      loginBtn.disabled = false;
+      loginBtn.classList.remove('loading');
+      btnText.textContent = 'Sign In';
+    }
+  }
+
+  function onLoginFailure(error) {
+    showError('An error occurred. Please try again.');
+    const loginBtn = document.getElementById('loginBtn');
+    const btnText = document.getElementById('btnText');
+    loginBtn.disabled = false;
+    loginBtn.classList.remove('loading');
+    btnText.textContent = 'Sign In';
+    console.error('Login error:', error);
+  }
+
+  function showError(message) {
+    const errorMsg = document.getElementById('errorMessage');
+    const errorText = document.getElementById('errorText');
+    errorText.textContent = message;
+    errorMsg.classList.add('show');
+    
+    setTimeout(() => {
+      errorMsg.classList.remove('show');
+    }, 4000);
+  }
+
+  // Press Enter to submit
+  document.getElementById('loginForm').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      document.getElementById('loginBtn').click();
+    }
+  });
+</script>
+
+</body>
+</html>

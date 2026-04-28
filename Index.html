@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OUMA Document Workflow System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <?!= include('Stylesheet'); ?>
+</head>
+<body>
+
+<!-- ══ LOADING SCREEN ═══════════════════════════════════════════ -->
+<div id="loadingScreen" class="loading-screen">
+  <div class="loading-logo">
+    <div class="loading-emblem">
+      <img src="https://drive.google.com/thumbnail?id=1gqzCl6h0R_n1-7Q5DBmCfwzUmEXk-qBX&sz=1200" class="logo" />
+    </div>
+    <div class="loading-text">
+      <span class="loading-org">Office of the Undersecretary for Migration Affairs</span>
+      <span class="loading-title">Document Management System</span>
+    </div>
+    <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+  </div>
+</div>
+
+<!-- ══ APP SHELL ════════════════════════════════════════════════ -->
+<div id="appShell" class="app-shell" style="display:none;">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <img src="https://drive.google.com/thumbnail?id=1gqzCl6h0R_n1-7Q5DBmCfwzUmEXk-qBX&sz=1200" class="brand-icon" />
+      <div class="brand-text">
+        <span class="brand-name">DMS</span>
+        <span class="brand-sub">OUMA</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle"><i class="bi bi-layout-sidebar"></i></button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">WORKSPACE</div>
+      <ul class="nav-list">
+        <li class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')">
+          <i class="bi bi-house-door"></i><span>Dashboard</span>
+          <div class="nav-indicator"></div>
+        </li>
+        <li class="nav-item" data-tab="newsubmission" onclick="switchTab('newsubmission')">
+          <i class="bi bi-plus-circle"></i><span>New Submission</span>
+          <div class="nav-indicator"></div>
+        </li>
+        <li class="nav-item" data-tab="mysubmissions" onclick="switchTab('mysubmissions')">
+          <i class="bi bi-file-earmark-text"></i><span>My Submissions</span>
+          <span class="nav-badge" id="mySubBadge" style="display:none;">0</span>
+          <div class="nav-indicator"></div>
+        </li>
+        <li class="nav-item" data-tab="actionrequired" onclick="switchTab('actionrequired')">
+          <i class="bi bi-bell"></i><span>Action Required</span>
+          <span class="nav-badge urgent" id="actionBadge" style="display:none;">0</span>
+          <div class="nav-indicator"></div>
+        </li>
+      </ul>
+
+      <div class="nav-section-label">MANAGEMENT</div>
+      <ul class="nav-list">
+        <li class="nav-item" data-tab="alldocuments" onclick="switchTab('alldocuments')" id="navAllDocs">
+          <i class="bi bi-files"></i><span>All Submissions</span>
+          <div class="nav-indicator"></div>
+        </li>
+        <li class="nav-item" data-tab="esignature" onclick="switchTab('esignature')" id="navEsig" style="display:none;">
+          <i class="bi bi-pen"></i><span>E-Signature Queue</span>
+          <span class="nav-badge" id="esigBadge" style="display:none;">0</span>
+          <div class="nav-indicator"></div>
+        </li>
+        <li class="nav-item" data-tab="printing" onclick="switchTab('printing')" id="navPrint">
+          <i class="bi bi-printer"></i><span>Printing</span>
+          <div class="nav-indicator"></div>
+        </li>
+        <li class="nav-item" data-tab="outgoing" onclick="switchTab('outgoing')" id="navOutgoing">
+          <i class="bi bi-send"></i><span>Outgoing</span>
+          <div class="nav-indicator"></div>
+        </li>
+        <li class="nav-item" data-tab="completed" onclick="switchTab('completed')">
+          <i class="bi bi-check-circle"></i><span>Completed</span>
+          <div class="nav-indicator"></div>
+        </li>
+        <li class="nav-item" data-tab="archive" onclick="switchTab('archive')">
+          <i class="bi bi-archive"></i><span>Archive</span>
+          <div class="nav-indicator"></div>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="sidebar-footer-btn" onclick="switchTab('settings')">
+        <i class="bi bi-gear"></i><span>Settings</span>
+      </button>
+      <div class="clock-display">
+        <span id="sidebarTime">00:00</span>
+        <span id="sidebarDate">Monday, Jan 1</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content" id="mainContent">
+
+    <!-- TOP BAR -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-toggle" id="mobileToggle"><i class="bi bi-list"></i></button>
+        <div class="breadcrumb">
+          <span class="breadcrumb-root">OUMA</span>
+          <i class="bi bi-chevron-right"></i>
+          <span id="currentPageTitle">Dashboard</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="topbar-btn" onclick="refreshCurrentTab()" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
+        <button class="topbar-btn" onclick="openNotifModal('notifModal')" title="Notifications">
+          <i class="bi bi-bell"></i>
+        </button>
+        <button class="topbar-btn" onclick="switchTab('newsubmission')" title="New Submission">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+        <div class="topbar-divider"></div>
+        <div class="topbar-user">
+          <div class="topbar-avatar" id="topbarAvatar">DO</div>
+          <div class="topbar-user-info">
+            <span id="topbarName">Desk Officer</span>
+            <span id="topbarRole" class="topbar-role">Division I</span>
+          </div>
+        </div>
+        <button class="user-menu-btn" onclick="toggleUserMenu()"><i class="bi bi-chevron-down"></i></button>
+      </div>
+    </header>
+
+    <!-- PAGE CONTAINER -->
+    <div class="page-container" id="pageContainer">
+
+      <!-- ══ DASHBOARD TAB ══ -->
+      <section class="tab-page active" id="tab-dashboard">
+        <div class="page-hero">
+          <div class="hero-text">
+            <h1 class="hero-title">Good morning, <span id="heroName">Officer</span></h1>
+            <p class="hero-sub">Here's your document workflow overview</p>
+          </div>
+          <button class="hero-cta" onclick="switchTab('newsubmission')">
+            <i class="bi bi-plus-lg"></i> New Submission
+          </button>
+        </div>
+
+        <!-- STAT CARDS -->
+        <div class="stats-grid" id="dashboardStats">
+          <div class="stat-card" onclick="switchTab('mysubmissions')">
+            <div class="stat-icon blue"><i class="bi bi-file-earmark-text"></i></div>
+            <div class="stat-body">
+              <span class="stat-num" id="statTotal">—</span>
+              <span class="stat-lbl">My Submissions</span>
+            </div>
+            <div class="stat-trend up"><i class="bi bi-arrow-up-right"></i></div>
+          </div>
+          <div class="stat-card" onclick="switchTab('actionrequired')">
+            <div class="stat-icon orange"><i class="bi bi-clock-history"></i></div>
+            <div class="stat-body">
+              <span class="stat-num" id="statPending">—</span>
+              <span class="stat-lbl">Pending Action</span>
+            </div>
+            <div class="stat-trend up"><i class="bi bi-arrow-up-right"></i></div>
+          </div>
+          <div class="stat-card" onclick="switchTab('alldocuments')">
+            <div class="stat-icon green"><i class="bi bi-check2-circle"></i></div>
+            <div class="stat-body">
+              <span class="stat-num" id="statApproved">—</span>
+              <span class="stat-lbl">Approved Today</span>
+            </div>
+            <div class="stat-trend up"><i class="bi bi-arrow-up-right"></i></div>
+          </div>
+          <div class="stat-card" onclick="switchTab('outgoing')">
+            <div class="stat-icon purple"><i class="bi bi-send-check"></i></div>
+            <div class="stat-body">
+              <span class="stat-num" id="statReleased">—</span>
+              <span class="stat-lbl">Released</span>
+            </div>
+            <div class="stat-trend neutral"><i class="bi bi-dash"></i></div>
+          </div>
+        </div>
+
+        <!-- RECENT ACTIVITY + QUICK ACTIONS -->
+        <div class="dashboard-grid">
+          <div class="dash-card">
+            <div class="dash-card-header">
+              <h3><i class="bi bi-activity"></i> Recent Submissions</h3>
+              <button class="dash-card-action" onclick="switchTab('mysubmissions')">View all</button>
+            </div>
+            <div class="recent-list" id="recentList">
+              <div class="empty-state small">
+                <i class="bi bi-inbox"></i>
+                <span>No recent submissions</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="dash-card">
+            <div class="dash-card-header">
+              <h3><i class="bi bi-bell"></i> Notifications</h3>
+              <button class="dash-card-action" onclick="clearNotifications()">Clear all</button>
+            </div>
+            <div class="notif-list" id="notifList">
+              <div class="notif-item unread">
+                <div class="notif-dot"></div>
+                <div class="notif-body">
+                  <div style="display: flex; justify-content: space-between;">
+                    <span class="notif-text">Wynona Kua — MEMO_SampleDocs_Subject</span>
+                    <span class="status-pill draft">Draft</span>
+                  </div>
+                  <span class="notif-time">Just now</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="dash-card" style="grid-column: span 2;">
+            <div class="dash-card-header">
+              <h3><i class="bi bi-lightning"></i> Quick Actions</h3>
+            </div>
+            <div class="quick-actions">
+              <button class="qa-btn" onclick="switchTab('newsubmission')">
+                <i class="bi bi-plus-circle-fill"></i>
+                <span>Submit Draft</span>
+              </button>
+              <button class="qa-btn" onclick="switchTab('actionrequired')">
+                <i class="bi bi-bell-fill"></i>
+                <span>View Actions</span>
+              </button>
+              <button class="qa-btn" onclick="switchTab('alldocuments')">
+                <i class="bi bi-files"></i>
+                <span>Browse All</span>
+              </button>
+              <button class="qa-btn" onclick="switchTab('printing')">
+                <i class="bi bi-printer-fill"></i>
+                <span>Print Queue</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="dash-card workflow-card">
+            <div class="dash-card-header">
+              <h3><i class="bi bi-diagram-3"></i> Workflow Pipeline</h3>
+            </div>
+            <div class="pipeline">
+              <div class="pipeline-step" id="pipe-draft">
+                <div class="pipe-icon"><i class="bi bi-pencil"></i></div>
+                <span class="pipe-label">Draft</span>
+                <span class="pipe-count" id="pipeDraft">0</span>
+              </div>
+              <div class="pipe-arrow"><i class="bi bi-chevron-right"></i></div>
+              <div class="pipeline-step" id="pipe-director">
+                <div class="pipe-icon"><i class="bi bi-person-check"></i></div>
+                <span class="pipe-label">Director</span>
+                <span class="pipe-count" id="pipeDirector">0</span>
+              </div>
+              <div class="pipe-arrow"><i class="bi bi-chevron-right"></i></div>
+              <div class="pipeline-step" id="pipe-das">
+                <div class="pipe-icon"><i class="bi bi-person-badge"></i></div>
+                <span class="pipe-label">DAS</span>
+                <span class="pipe-count" id="pipeDas">0</span>
+              </div>
+              <div class="pipe-arrow"><i class="bi bi-chevron-right"></i></div>
+              <div class="pipeline-step" id="pipe-assec">
+                <div class="pipe-icon"><i class="bi bi-briefcase"></i></div>
+                <span class="pipe-label">AsSec</span>
+                <span class="pipe-count" id="pipeAssec">0</span>
+              </div>
+              <div class="pipe-arrow"><i class="bi bi-chevron-right"></i></div>
+              <div class="pipeline-step" id="pipe-usec">
+                <div class="pipe-icon"><i class="bi bi-award"></i></div>
+                <span class="pipe-label">USec</span>
+                <span class="pipe-count" id="pipeUsec">0</span>
+              </div>
+              <div class="pipe-arrow"><i class="bi bi-chevron-right"></i></div>
+              <div class="pipeline-step complete">
+                <div class="pipe-icon"><i class="bi bi-check2"></i></div>
+                <span class="pipe-label">Released</span>
+                <span class="pipe-count" id="pipeReleased">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ NEW SUBMISSION TAB ══ -->
+      <section class="tab-page" id="tab-newsubmission">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">New Submission</h2>
+            <p class="page-sub">Upload a draft document to begin the workflow</p>
+          </div>
+        </div>
+
+        <div class="submission-layout">
+          <!-- STEP PROGRESS -->
+          <div class="step-progress">
+            <div class="step active" id="step1Ind">
+              <div class="step-num">1</div>
+              <span>Document Details</span>
+            </div>
+            <div class="step-line"></div>
+            <div class="step" id="step2Ind">
+              <div class="step-num">2</div>
+              <span>File Upload</span>
+            </div>
+            <div class="step-line"></div>
+            <div class="step" id="step3Ind">
+              <div class="step-num">3</div>
+              <span>Review & Submit</span>
+            </div>
+          </div>
+
+          <!-- STEP 1: DETAILS -->
+          <div class="submission-step active" id="step1">
+            <div class="form-card">
+              <div class="form-card-header">
+                <i class="bi bi-info-circle-fill"></i>
+                <h3>Document Information</h3>
+              </div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">Document Type <span class="req">*</span></label>
+                  <select class="form-select" id="docType">
+                    <option value="">Select type...</option>
+                    <option value="MEMO">Memorandum (MEMO)</option>
+                    <option value="LTR">Letter (LTR)</option>
+                    <option value="CIR">Circular (CIR)</option>
+                    <option value="RPT">Report (RPT)</option>
+                    <option value="MFS">Memorandum for the Secretary (MFS)</option>
+                    <option value="MFP">Memorandum for the President (MFP)</option>
+                    <option value="DAO">Department Administrative Order (DAO)</option>
+                    <option value="DM">Department Memorandum (DM)</option>
+                    <option value="OTHER">Other</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Addressee / Recipient <span class="req">*</span></label>
+                  <input type="text" class="form-input" id="docAddressee" placeholder="e.g. The Secretary, Department of...">
+                </div>
+                <div class="form-group span-2">
+                  <label class="form-label">Subject / Title <span class="req">*</span></label>
+                  <input type="text" class="form-input" id="docSubject" placeholder="Brief description of the document">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Division</label>
+                  <select class="form-select" id="docDivision">
+                    <option value="DIV1">Division I</option>
+                    <option value="DIV2">Division II</option>
+                    <option value="DIV3">Division III</option>
+                    <option value="DIV4">Division IV</option>
+                    <option value="ADMIN">Admin Division</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Priority Level</label>
+                  <select class="form-select" id="docPriority">
+                    <option value="ROUTINE">Routine</option>
+                    <option value="PRIORITY">Priority</option>
+                    <option value="URGENT">Urgent</option>
+                  </select>
+                </div>
+                <div class="form-group span-2">
+                  <label class="form-label">Remarks / Notes</label>
+                  <textarea class="form-textarea" id="docRemarks" rows="3" placeholder="Optional additional notes..."></textarea>
+                </div>
+              </div>
+              <div class="form-actions">
+                <div></div>
+                <button class="btn btn-primary" onclick="goToStep(2)">
+                  Continue <i class="bi bi-arrow-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 2: FILE UPLOAD -->
+          <div class="submission-step" id="step2">
+            <div class="form-card">
+              <div class="form-card-header">
+                <i class="bi bi-cloud-upload-fill"></i>
+                <h3>Attach Document File</h3>
+              </div>
+
+              <div class="upload-zone" id="uploadZone" onclick="triggerFileInput()" ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragleave="handleDragLeave(event)">
+                <div class="upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+                <p class="upload-title">Drop file here or click to browse</p>
+                <p class="upload-sub">Supports Word (.docx), PDF, and Google Docs links</p>
+                <input type="file" id="fileInput" style="display:none;" accept=".docx,.doc,.pdf" onchange="handleFileSelect(event)">
+              </div>
+
+              <div class="upload-preview" id="uploadPreview" style="display:none;">
+                <div class="preview-icon"><i class="bi bi-file-earmark-word-fill"></i></div>
+                <div class="preview-info">
+                  <span class="preview-name" id="previewFileName">document.docx</span>
+                  <span class="preview-size" id="previewFileSize">—</span>
+                </div>
+                <button class="preview-remove" onclick="removeFile()"><i class="bi bi-x-circle-fill"></i></button>
+              </div>
+
+              <div class="divider-or"><span>or</span></div>
+
+              <div class="form-group">
+                <label class="form-label"><i class="bi bi-google"></i> Google Docs Link</label>
+                <div class="input-with-btn">
+                  <input type="url" class="form-input" id="googleDocsLink" placeholder="Paste Google Docs URL here...">
+                  <button class="input-btn" onclick="verifyGoogleLink()"><i class="bi bi-check2"></i> Verify</button>
+                </div>
+                <small class="form-hint">Make sure the document is accessible to OUMA officers</small>
+              </div>
+
+              <div class="attachment-note" id="attachmentNote" style="display:none;">
+                <i class="bi bi-info-circle"></i>
+                <span>For drafts with attachments (MFS&MFP, MFS&LTR), combine all files into a single document before uploading.</span>
+              </div>
+
+              <div class="form-actions">
+                <button class="btn btn-ghost" onclick="goToStep(1)">
+                  <i class="bi bi-arrow-left"></i> Back
+                </button>
+                <button class="btn btn-primary" onclick="goToStep(3)">
+                  Continue <i class="bi bi-arrow-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- STEP 3: REVIEW -->
+          <div class="submission-step" id="step3">
+            <div class="form-card">
+              <div class="form-card-header">
+                <i class="bi bi-clipboard2-check-fill"></i>
+                <h3>Review & Submit</h3>
+              </div>
+
+              <div class="review-grid" id="reviewGrid">
+                <!-- Populated by JS -->
+              </div>
+
+              <div class="endorsement-section">
+                <div class="endorsement-label">
+                  <i class="bi bi-send-fill"></i>
+                  <span>Endorse to</span>
+                </div>
+                <div class="endorsement-buttons">
+                  <button class="endorse-btn active" id="endDir" onclick="selectEndorsee('Director')">
+                    <i class="bi bi-person-check"></i> Director
+                  </button>
+                  <button class="endorse-btn" id="endDAS" onclick="selectEndorsee('DAS')">
+                    <i class="bi bi-person-badge"></i> DAS
+                  </button>
+                  <button class="endorse-btn" id="endAsSec" onclick="selectEndorsee('AsSec')">
+                    <i class="bi bi-briefcase"></i> AsSec
+                  </button>
+                  <button class="endorse-btn" id="endUSec" onclick="selectEndorsee('USec')">
+                    <i class="bi bi-award"></i> USec
+                  </button>
+                </div>
+              </div>
+
+              <div class="form-actions">
+                <button class="btn btn-ghost" onclick="goToStep(2)">
+                  <i class="bi bi-arrow-left"></i> Back
+                </button>
+                <div style="display:flex;gap:8px;">
+                  <button class="btn btn-outline" onclick="saveDraftOnly()">
+                    <i class="bi bi-floppy"></i> Save Draft
+                  </button>
+                  <button class="btn btn-primary" onclick="submitDocument()">
+                    <i class="bi bi-send"></i> Submit
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ MY SUBMISSIONS TAB ══ -->
+      <section class="tab-page" id="tab-mysubmissions">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">My Submissions</h2>
+            <p class="page-sub">Track the status of documents you've submitted</p>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <div class="filter-tabs">
+            <button class="filter-tab active" onclick="filterMyDocs('ALL', this)">All</button>
+            <button class="filter-tab" onclick="filterMyDocs('DRAFT', this)">Drafts</button>
+            <button class="filter-tab" onclick="filterMyDocs('PENDING', this)">Pending</button>
+            <button class="filter-tab" onclick="filterMyDocs('APPROVED', this)">Approved</button>
+            <button class="filter-tab" onclick="filterMyDocs('RETURNED', this)">Returned</button>
+            <button class="filter-tab" onclick="filterMyDocs('COMPLETED', this)">Completed</button>
+          </div>
+          <div class="filter-search">
+            <i class="bi bi-search"></i>
+            <input type="text" placeholder="Search submissions..." id="myDocsSearch" oninput="searchMyDocs(this.value)">
+          </div>
+        </div>
+
+        <div class="doc-list" id="myDocsList">
+          <div class="empty-state">
+            <i class="bi bi-file-earmark-plus"></i>
+            <h3>No submissions yet</h3>
+            <p>Start by creating your first document submission</p>
+            <button class="btn btn-primary" onclick="switchTab('newsubmission')">
+              <i class="bi bi-plus-lg"></i> New Submission
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ ACTION REQUIRED TAB ══ -->
+      <section class="tab-page" id="tab-actionrequired">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Action Required</h2>
+            <p class="page-sub">Documents awaiting your review or approval</p>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <div class="filter-tabs">
+            <button class="filter-tab active" onclick="filterActions('ALL', this)">All</button>
+            <button class="filter-tab" onclick="filterActions('FOR_REVISION', this)">For Revision</button>
+            <button class="filter-tab" onclick="filterActions('FOR_APPROVAL', this)">For Approval</button>
+            <button class="filter-tab" onclick="filterActions('FOR_REVIEW', this)">For Review</button>
+            <button class="filter-tab" onclick="filterActions('FOR_SIGNATURE', this)">For Signature</button>
+          </div>
+          <div class="filter-search">
+            <i class="bi bi-search"></i>
+            <input type="text" placeholder="Search..." id="actionSearch" oninput="searchActions(this.value)">
+          </div>
+        </div>
+
+        <div class="doc-list" id="actionList">
+          <!-- Sample urgent item for demonstration -->
+          <div class="doc-item urgent-item">
+            <div class="doc-item-left">
+              <div class="doc-type-chip memo">MEMO</div>
+              <div class="doc-item-info">
+                <span class="doc-item-title">Sample: Memorandum on Policy Update</span>
+                <span class="doc-item-meta">
+                  <i class="bi bi-person"></i> Cruz, Ma. R. &nbsp;·&nbsp;
+                  <i class="bi bi-clock"></i> 2 hours ago
+                </span>
+              </div>
+            </div>
+            <div class="doc-item-right">
+              <span class="status-pill urgent">For Approval</span>
+              <button class="btn btn-sm btn-primary" onclick="openDocumentModal('sample1')">
+                <i class="bi bi-eye"></i> Review
+              </button>
+            </div>
+          </div>
+          <div class="doc-item">
+            <div class="doc-item-left">
+              <div class="doc-type-chip ltr">LTR</div>
+              <div class="doc-item-info">
+                <span class="doc-item-title">Sample: Letter of Endorsement for OFW Program</span>
+                <span class="doc-item-meta">
+                  <i class="bi bi-person"></i> Santos, J. &nbsp;·&nbsp;
+                  <i class="bi bi-clock"></i> Yesterday
+                </span>
+              </div>
+            </div>
+            <div class="doc-item-right">
+              <span class="status-pill review">For Review</span>
+              <button class="btn btn-sm btn-outline" onclick="openDocumentModal('sample2')">
+                <i class="bi bi-eye"></i> View
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ ALL DOCUMENTS TAB ══ -->
+      <section class="tab-page" id="tab-alldocuments">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">All Submissions</h2>
+            <p class="page-sub">Division-level view of all document submissions</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-outline" onclick="exportDocs()"><i class="bi bi-download"></i> Export</button>
+          </div>
+        </div>
+
+        <!-- DIVISION FILTER TABS -->
+        <div class="division-tabs">
+          <button class="div-tab active" onclick="filterByDivision('ALL', this)">All Divisions</button>
+          <button class="div-tab" onclick="filterByDivision('DIV1', this)">Division I</button>
+          <button class="div-tab" onclick="filterByDivision('DIV2', this)">Division II</button>
+          <button class="div-tab" onclick="filterByDivision('DIV3', this)">Division III</button>
+          <button class="div-tab" onclick="filterByDivision('DIV4', this)">Division IV</button>
+          <button class="div-tab" onclick="filterByDivision('ADMIN', this)">Admin</button>
+        </div>
+
+        <div class="filter-bar">
+          <div class="filter-tabs">
+            <button class="filter-tab active" onclick="filterAllDocs('ALL', this)">All Status</button>
+            <button class="filter-tab" onclick="filterAllDocs('DRAFT', this)">Draft</button>
+            <button class="filter-tab" onclick="filterAllDocs('FOR_DIRECTOR', this)">For Director</button>
+            <button class="filter-tab" onclick="filterAllDocs('FOR_DAS', this)">For DAS</button>
+            <button class="filter-tab" onclick="filterAllDocs('FOR_ASSEC', this)">For AsSec</button>
+            <button class="filter-tab" onclick="filterAllDocs('FOR_USEC', this)">For USec</button>
+            <button class="filter-tab" onclick="filterAllDocs('FOR_SIGNATURE', this)">For Signature</button>
+            <button class="filter-tab" onclick="filterAllDocs('COMPLETED', this)">Completed</button>
+          </div>
+          <div class="filter-search">
+            <i class="bi bi-search"></i>
+            <input type="text" placeholder="Search all documents..." id="allDocsSearch" oninput="searchAllDocs(this.value)">
+          </div>
+        </div>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table" id="allDocsTable">
+            <thead>
+              <tr>
+                <th>Document</th>
+                <th>Type</th>
+                <th>Division</th>
+                <th>Submitted By</th>
+                <th>Status</th>
+                <th>Last Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="allDocsTbody">
+              <tr><td colspan="7" class="table-empty">
+                <div class="empty-state small"><i class="bi bi-inbox"></i><span>No documents found</span></div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ══ E-SIGNATURE TAB ══ -->
+      <section class="tab-page" id="tab-esignature">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">E-Signature Queue</h2>
+            <p class="page-sub">Documents awaiting electronic signature</p>
+          </div>
+        </div>
+        <div class="doc-list" id="esigList">
+          <div class="empty-state">
+            <i class="bi bi-pen"></i>
+            <h3>No documents for signature</h3>
+            <p>Documents approved by AsSec or USec will appear here</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ PRINTING TAB ══ -->
+      <section class="tab-page" id="tab-printing">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Print Queue</h2>
+            <p class="page-sub">Generate clean copies or approval-trail documents</p>
+          </div>
+        </div>
+
+        <div class="print-grid" id="printGrid">
+          <div class="empty-state">
+            <i class="bi bi-printer"></i>
+            <h3>Print queue is empty</h3>
+            <p>Documents cleared for printing will appear here</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ OUTGOING TAB ══ -->
+      <section class="tab-page" id="tab-outgoing">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Outgoing Communications</h2>
+            <p class="page-sub">Signed documents ready for release</p>
+          </div>
+        </div>
+
+        <div class="doc-list" id="outgoingList">
+          <div class="empty-state">
+            <i class="bi bi-send"></i>
+            <h3>No outgoing documents</h3>
+            <p>Signed and printed documents will appear here for final release</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ COMPLETED TAB ══ -->
+      <section class="tab-page" id="tab-completed">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Completed Documents</h2>
+            <p class="page-sub">Archive of released and completed documents</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-outline"><i class="bi bi-funnel"></i> Filter</button>
+          </div>
+        </div>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>Document</th>
+                <th>Type</th>
+                <th>Released By</th>
+                <th>Release Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="completedTbody">
+              <tr><td colspan="5" class="table-empty">
+                <div class="empty-state small"><i class="bi bi-archive"></i><span>No completed documents</span></div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ══ ARCHIVE TAB ══ -->
+      <section class="tab-page" id="tab-archive">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Archived Documents</h2>
+            <p class="page-sub">Archive of all deleted documents</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-outline"><i class="bi bi-funnel"></i> Filter</button>
+          </div>
+        </div>
+
+        <div class="doc-table-wrap">
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th>Document</th>
+                <th>Type</th>
+                <th>Released By</th>
+                <th>Release Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="deletedTbody">
+              <tr><td colspan="5" class="table-empty">
+                <div class="empty-state small"><i class="bi bi-archive"></i><span>No deleted documents</span></div>
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ══ SETTINGS TAB ══ -->
+      <section class="tab-page" id="tab-settings">
+        <div class="page-header">
+          <div>
+            <h2 class="page-title">Settings</h2>
+            <p class="page-sub">Configure your profile and system preferences</p>
+          </div>
+        </div>
+
+        <div class="settings-grid">
+          <div class="settings-card">
+            <div class="settings-card-header"><i class="bi bi-person-circle"></i> Profile</div>
+            <div class="form-group">
+              <label class="form-label">Full Name</label>
+              <input type="text" class="form-input" id="settingName" placeholder="Your full name">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Division</label>
+              <select class="form-select" id="settingDivision">
+                <option value="DIV1">Division I</option>
+                <option value="DIV2">Division II</option>
+                <option value="DIV3">Division III</option>
+                <option value="DIV4">Division IV</option>
+                <option value="ADMIN">Admin Division</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Role</label>
+              <select class="form-select" id="settingRole">
+                <option value="DO">Desk Officer</option>
+                <option value="DIRECTOR">Division Director</option>
+                <option value="DAS">Deputy Assistant Secretary</option>
+                <option value="ASSEC">Assistant Secretary</option>
+                <option value="USEC">Undersecretary</option>
+                <option value="SECRETARY">Secretary</option>
+              </select>
+            </div>
+            <button class="btn btn-primary" style="width:100%;" onclick="saveProfile()">
+              <i class="bi bi-floppy"></i> Save Profile
+            </button>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-header"><i class="bi bi-bell"></i> Notifications</div>
+            <div class="toggle-list">
+              <div class="toggle-item">
+                <div>
+                  <span class="toggle-label">Email notifications</span>
+                  <span class="toggle-desc">Get notified via email on status changes</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="notifEmail" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="toggle-item">
+                <div>
+                  <span class="toggle-label">Approval alerts</span>
+                  <span class="toggle-desc">Alert when document is approved/returned</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="notifApproval" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+              <div class="toggle-item">
+                <div>
+                  <span class="toggle-label">New submission alerts</span>
+                  <span class="toggle-desc">Alert when new docs are submitted to you</span>
+                </div>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="notifNew" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div><!-- /page-container -->
+  </main>
+</div><!-- /app-shell -->
+
+<!-- ══ DOCUMENT MODAL ════════════════════════════════════════════ -->
+<div class="modal-overlay" id="docModal" style="display:none;" onclick="closeDocModal(event)">
+  <div class="doc-modal">
+    <div class="doc-modal-header">
+      <div class="doc-modal-title-wrap">
+        <div class="doc-type-chip memo" id="modalDocType">MEMO</div>
+        <div>
+          <h3 id="modalDocTitle">Document Title</h3>
+          <span class="doc-modal-meta" id="modalDocMeta">Submitted by — Date</span>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeDocModal()"><i class="bi bi-x-lg"></i></button>
+    </div>
+
+    <div class="doc-modal-body">
+      <div class="doc-modal-left">
+        <!-- VERSION HISTORY -->
+        <div class="collapsible">
+          <button class="collapsible-trigger" onclick="toggleCollapse('versionHistory')">
+            <i class="bi bi-clock-history"></i> Version History
+            <i class="bi bi-chevron-down collapsible-arrow" id="versionHistoryArrow"></i>
+          </button>
+          <div class="collapsible-body" id="versionHistory">
+            <div class="version-list" id="versionList">
+              <div class="version-item current">
+                <div class="version-dot"></div>
+                <div class="version-info">
+                  <span class="version-label">v1 — Initial Draft</span>
+                  <span class="version-meta">Uploaded by DO</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- APPROVAL TRAIL -->
+        <div class="collapsible">
+          <button class="collapsible-trigger" onclick="toggleCollapse('approvalTrail')">
+            <i class="bi bi-diagram-3"></i> Approval Trail
+            <i class="bi bi-chevron-down collapsible-arrow" id="approvalTrailArrow"></i>
+          </button>
+          <div class="collapsible-body" id="approvalTrail">
+            <div class="approval-trail" id="trailList">
+              <div class="trail-item done">
+                <div class="trail-icon"><i class="bi bi-pencil"></i></div>
+                <div class="trail-info">
+                  <span class="trail-label">Submitted</span>
+                  <span class="trail-meta">By DO · Jan 1, 2025 9:00 AM</span>
+                </div>
+                <span class="trail-status approved">Done</span>
+              </div>
+              <div class="trail-item pending">
+                <div class="trail-icon"><i class="bi bi-person-check"></i></div>
+                <div class="trail-info">
+                  <span class="trail-label">Director Review</span>
+                  <span class="trail-meta">Awaiting action</span>
+                </div>
+                <span class="trail-status pending">Pending</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- COMMENTS -->
+        <div class="collapsible open">
+          <button class="collapsible-trigger" onclick="toggleCollapse('commentsPanel')">
+            <i class="bi bi-chat-left-text"></i> Comments
+            <i class="bi bi-chevron-down collapsible-arrow open" id="commentsPanelArrow"></i>
+          </button>
+          <div class="collapsible-body show" id="commentsPanel">
+            <div class="comment-list" id="commentList">
+              <div class="comment-item">
+                <div class="comment-avatar">D</div>
+                <div class="comment-body">
+                  <span class="comment-author">Director Santos</span>
+                  <span class="comment-time">2 hours ago</span>
+                  <p class="comment-text">Please revise Section 3 to align with the latest policy directive.</p>
+                </div>
+              </div>
+            </div>
+            <div class="comment-input-wrap">
+              <textarea class="comment-input" id="newComment" placeholder="Add a comment..." rows="2"></textarea>
+              <button class="btn btn-sm btn-primary" onclick="addComment()"><i class="bi bi-send"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="doc-modal-right">
+        <!-- ACTION PANEL -->
+        <div class="action-panel">
+          <div class="action-panel-title"><i class="bi bi-lightning-fill"></i> Actions</div>
+
+          <!-- FILE ACTIONS -->
+          <div class="action-group">
+            <button class="action-btn-full blue" onclick="openFile()">
+              <i class="bi bi-eye"></i> Open Document
+            </button>
+            <button class="action-btn-full" onclick="uploadNewVersion()">
+              <i class="bi bi-cloud-upload"></i> Upload New Version
+            </button>
+          </div>
+
+          <!-- SPECIAL FLAGS -->
+          <div class="collapsible open">
+            <button class="collapsible-trigger" onclick="toggleCollapse('specialFlags')">
+              <i class="bi bi-flag"></i> Flag Document
+              <i class="bi bi-chevron-down collapsible-arrow open" id="specialFlagsArrow"></i>
+            </button>
+            <div class="collapsible-body show" id="specialFlags">
+              <div class="flag-buttons">
+                <button class="flag-btn discussion" onclick="flagDoc('DISCUSSION')">
+                  <i class="bi bi-chat-dots"></i> For Discussion
+                </button>
+                <button class="flag-btn not-approval" onclick="flagDoc('NOT_FOR_APPROVAL')">
+                  <i class="bi bi-x-circle"></i> Not for Approval
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ENDORSEMENT -->
+          <div class="collapsible open">
+            <button class="collapsible-trigger" onclick="toggleCollapse('endorsePanel')">
+              <i class="bi bi-send"></i> Endorse / Forward
+              <i class="bi bi-chevron-down collapsible-arrow open" id="endorsePanelArrow"></i>
+            </button>
+            <div class="collapsible-body show" id="endorsePanel">
+              <div class="endorse-grid">
+                <button class="endorse-action-btn" onclick="endorse('Director')">
+                  <i class="bi bi-person-check"></i><span>Director</span>
+                </button>
+                <button class="endorse-action-btn" onclick="endorse('DAS')">
+                  <i class="bi bi-person-badge"></i><span>DAS</span>
+                </button>
+                <button class="endorse-action-btn" onclick="endorse('AsSec')">
+                  <i class="bi bi-briefcase"></i><span>AsSec</span>
+                </button>
+                <button class="endorse-action-btn" onclick="endorse('USec')">
+                  <i class="bi bi-award"></i><span>USec</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- APPROVAL ACTIONS -->
+          <div class="collapsible open">
+            <button class="collapsible-trigger" onclick="toggleCollapse('approvalPanel')">
+              <i class="bi bi-check2-circle"></i> Approval Actions
+              <i class="bi bi-chevron-down collapsible-arrow open" id="approvalPanelArrow"></i>
+            </button>
+            <div class="collapsible-body show" id="approvalPanel">
+              <div class="approval-actions">
+                <button class="action-btn-full green" onclick="approveDoc()">
+                  <i class="bi bi-check2"></i> Approve
+                </button>
+                <button class="action-btn-full orange" onclick="returnDoc()">
+                  <i class="bi bi-arrow-return-left"></i> Return with Comment
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- OUTPUT GENERATION -->
+          <div class="collapsible open">
+            <button class="collapsible-trigger" onclick="toggleCollapse('outputPanel')">
+              <i class="bi bi-files"></i> Generate Outputs
+              <i class="bi bi-chevron-down collapsible-arrow open" id="outputPanelArrow"></i>
+            </button>
+            <div class="collapsible-body show" id="outputPanel">
+              <div class="output-buttons">
+                <button class="output-btn" onclick="generateCleanCopy()">
+                  <i class="bi bi-file-earmark-text"></i>
+                  <span>Clean Copy</span>
+                </button>
+                <button class="output-btn" onclick="generateApprovalCopy()">
+                  <i class="bi bi-file-earmark-ruled"></i>
+                  <span>With Approval Trail</span>
+                </button>
+                <button class="output-btn" onclick="sendToEsig()">
+                  <i class="bi bi-pen"></i>
+                  <span>Send to E-Signature</span>
+                </button>
+                <button class="output-btn" onclick="sendToPrinting()">
+                  <i class="bi bi-printer"></i>
+                  <span>Send to Printing</span>
+                </button>
+                <button class="output-btn full" onclick="sendToOutgoing()">
+                  <i class="bi bi-send"></i>
+                  <span>Send to Outgoing Communications</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TOAST CONTAINER ══ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<?!= include('Javascript'); ?>
+</body>
+</html>

@@ -1,0 +1,1323 @@
+<script>
+// =====================================================
+// GLOBAL STATE
+// =====================================================
+const App = {
+  currentTab:     'dashboard',
+  currentUser:    null,
+  currentRole:    'DO',  // DO | DIRECTOR | DAS | ASSEC | USEC | COMMS | SECRETARY | ADMIN
+  currentDivision:'DIV1',
+  endorseTarget:  'Director',
+  selectedFile:   null,
+  googleDocLink:  '',
+  currentDocId:   null,
+  myDocs:         [],
+  allDocs:        [],
+  filters:        { myDocs: 'ALL', actions: 'ALL', allDocs: 'ALL', division: 'ALL' },
+  searchQueries:  {},
+  roleConfig:     {}
+};
+
+// Role color mappings for consistency
+const ROLE_COLORS = {
+  'ADMIN': { bg: '#8b5cf6', light: '#ede9fe', text: '#5b21b6' },
+  'SECRETARY': { bg: '#ec4899', light: '#fce7f3', text: '#831843' },
+  'USEC': { bg: '#0ea5e9', light: '#cffafe', text: '#082f49' },
+  'ASSEC': { bg: '#06b6d4', light: '#cffafe', text: '#164e63' },
+  'DAS': { bg: '#14b8a6', light: '#ccfbf1', text: '#134e4a' },
+  'DIRECTOR': { bg: '#3b82f6', light: '#dbeafe', text: '#1e3a8a' },
+  'COMMS': { bg: '#f59e0b', light: '#fef3c7', text: '#78350f' },
+  'DO': { bg: '#8b5cf6', light: '#f3e8ff', text: '#5b21b6' }
+};
+
+// =====================================================
+// INIT
+// =====================================================
+window.addEventListener('load', () => {
+  // Check if user is logged in
+  loadUserSession();
+  
+  // If no session, redirect to login
+  if (!App.currentUser) {
+    window.location.href = '?view=login';
+    return;
+  }
+
+  // Get role config from server
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(onRoleConfigLoaded)
+      .withFailureHandler(() => initializeUI())
+      .getRoleConfig(App.currentRole);
+  }
+
+  // Initialize UI
+  initializeUI();
+});
+
+function loadUserSession() {
+  // Try to load from localStorage (set by login page)
+  const userJson = localStorage.getItem('ouma_user');
+  if (userJson) {
+    try {
+      App.currentUser = JSON.parse(userJson);
+      App.currentRole = App.currentUser.role;
+      App.currentDivision = App.currentUser.division || 'DIV1';
+      return;
+    } catch (e) {}
+  }
+
+  // If no localStorage session, try to get from server
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(onSessionLoaded)
+      .withFailureHandler(() => {
+        // No session, redirect to login
+        window.location.href = '?view=login';
+      })
+      .getCurrentUserSession();
+  }
+}
+
+function onSessionLoaded(user) {
+  if (user) {
+    App.currentUser = user;
+    App.currentRole = user.role;
+    App.currentDivision = user.division || 'DIV1';
+    localStorage.setItem('ouma_user', JSON.stringify(user));
+    updateUserDisplay();
+  } else {
+    window.location.href = '?view=login';
+  }
+}
+
+function onRoleConfigLoaded(config) {
+  if (config) {
+    App.roleConfig = config;
+    updateNavigationBasedOnRole();
+    loadDashboard();
+  }
+}
+
+function initializeUI() {
+  // Hide loading screen after animation
+  setTimeout(() => {
+    const ls = document.getElementById('loadingScreen');
+    if (ls) { ls.style.display = 'none'; }
+    const shell = document.getElementById('appShell');
+    if (shell) { shell.style.display = 'flex'; }
+  }, 2200);
+
+  startClock();
+  updateUserDisplay();
+  setupSidebarToggle();
+  setupMobileToggle();
+  updateNavigationBasedOnRole();
+
+  // Init tab
+  switchTab('dashboard');
+
+  // Load user profile
+  loadUserProfile();
+  loadDashboard();
+}
+
+// =====================================================
+// ROLE-BASED UI CUSTOMIZATION
+// =====================================================
+
+/**
+ * Updates navigation items based on user role
+ */
+function updateNavigationBasedOnRole() {
+  const role = App.currentRole;
+  const navItems = {
+    'ADMIN': ['dashboard', 'newsubmission', 'mysubmissions', 'actionrequired', 'alldocuments', 'printing', 'outgoing', 'completed', 'archive', 'settings'],
+    'SECRETARY': ['dashboard', 'alldocuments', 'esignature', 'printing', 'outgoing', 'completed', 'settings'],
+    'USEC': ['dashboard', 'actionrequired', 'alldocuments', 'printing', 'completed', 'settings'],
+    'ASSEC': ['dashboard', 'actionrequired', 'alldocuments', 'printing', 'completed', 'settings'],
+    'DAS': ['dashboard', 'actionrequired', 'alldocuments', 'printing', 'completed', 'settings'],
+    'DIRECTOR': ['dashboard', 'mysubmissions', 'actionrequired', 'printing', 'completed', 'settings'],
+    'COMMS': ['dashboard', 'outgoing', 'printing', 'completed', 'settings'],
+    'DO': ['dashboard', 'newsubmission', 'mysubmissions', 'actionrequired', 'completed', 'settings']
+  };
+
+  const allowedItems = navItems[role] || navItems['DO'];
+
+  // Hide/show nav items based on role
+  document.querySelectorAll('.nav-item').forEach(item => {
+    const tab = item.getAttribute('data-tab');
+    if (tab && !allowedItems.includes(tab)) {
+      item.style.display = 'none';
+    } else {
+      item.style.display = 'flex';
+    }
+  });
+
+  // Hide/show nav sections
+  updateNavSections(role);
+}
+
+function updateNavSections(role) {
+  const managementSection = document.querySelector('.nav-section-label:nth-of-type(2)');
+  if (managementSection) {
+    const hideForRoles = ['DO', 'DIRECTOR'];
+    managementSection.style.display = hideForRoles.includes(role) ? 'none' : 'block';
+  }
+}
+
+/**
+ * Updates which action panels are visible in document modal based on role permissions
+ */
+function updateDocumentModalPermissions() {
+  const role = App.currentRole;
+  const canApprove = ['DIRECTOR', 'DAS', 'ASSEC', 'USEC', 'ADMIN'].includes(role);
+  const canSign = role === 'SECRETARY';
+  const canRelease = ['SECRETARY', 'COMMS', 'ADMIN'].includes(role);
+
+  // Show/hide approval panel
+  const approvalPanel = document.getElementById('approvalPanel');
+  if (approvalPanel) {
+    approvalPanel.parentElement.style.display = canApprove ? 'block' : 'none';
+  }
+
+  // Show/hide e-signature panel
+  const endorsePanel = document.getElementById('endorsePanel');
+  if (endorsePanel) {
+    endorsePanel.parentElement.style.display = 
+      ['DIRECTOR', 'DAS', 'ASSEC', 'USEC', 'DO', 'ADMIN'].includes(role) ? 'block' : 'none';
+  }
+
+  // Show/hide output panel
+  const outputPanel = document.getElementById('outputPanel');
+  if (outputPanel) {
+    const hideOutputItems = role === 'DO';
+    if (hideOutputItems) {
+      outputPanel.parentElement.style.display = 'none';
+    }
+  }
+}
+
+// =====================================================
+// CLOCK
+// =====================================================
+function startClock() {
+  function tick() {
+    const now = new Date();
+    const t = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const d = now.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+    const el1 = document.getElementById('sidebarTime');
+    const el2 = document.getElementById('sidebarDate');
+    if (el1) el1.textContent = t;
+    if (el2) el2.textContent = d;
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+// =====================================================
+// USER PROFILE
+// =====================================================
+function loadUserProfile() {
+  // Load saved preferences from localStorage
+  try {
+    const saved = JSON.parse(localStorage.getItem('docflow_user') || '{}');
+    if (!App.currentUser) {
+      if (saved.name) App.currentUser = saved;
+      if (saved.role) App.currentRole = saved.role;
+      if (saved.division) App.currentDivision = saved.division;
+    }
+  } catch(e) {}
+  updateUserDisplay();
+}
+
+function updateUserDisplay() {
+  const user = App.currentUser;
+  const role = App.currentRole;
+  const division = App.currentDivision;
+
+  const name = user ? (user.name || user.email || 'User') : 'Officer';
+  const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+  const roleLabels = { 
+    ADMIN: 'Administrator',
+    DO: 'Desk Officer', 
+    DIRECTOR: 'Division Director', 
+    DAS: 'Dep. Asst. Secretary', 
+    ASSEC: 'Assistant Secretary', 
+    USEC: 'Undersecretary', 
+    COMMS: 'Communication Officer',
+    SECRETARY: 'Secretary' 
+  };
+  const divLabels = { DIV1: 'Division I', DIV2: 'Division II', DIV3: 'Division III', DIV4: 'Division IV', ADMIN: 'Admin Division' };
+  const roleLabel = roleLabels[role] || role;
+  const divLabel = divLabels[division] || division;
+
+  setText('userName', name);
+  setText('userRole', roleLabel);
+  setText('userAvatar', initials);
+  setText('topbarName', name);
+  setText('topbarRole', `${roleLabel}${division ? ' · ' + divLabel : ''}`);
+  setText('topbarAvatar', initials);
+  setText('heroName', name.split(' ')[0]);
+
+  // Apply role color scheme to sidebar
+  applyRoleColorScheme(role);
+
+  // Populate settings
+  const nameEl = document.getElementById('settingName');
+  const roleEl = document.getElementById('settingRole');
+  const divEl = document.getElementById('settingDivision');
+  if (nameEl) nameEl.value = name;
+  if (roleEl) roleEl.value = role;
+  if (divEl && division) divEl.value = division;
+}
+
+/**
+ * Apply visual theme based on user role
+ */
+function applyRoleColorScheme(role) {
+  const colors = ROLE_COLORS[role] || ROLE_COLORS['DO'];
+  const root = document.documentElement;
+  
+  // Update CSS variables for role-specific colors
+  root.style.setProperty('--role-primary', colors.bg);
+  root.style.setProperty('--role-light', colors.light);
+  root.style.setProperty('--role-text', colors.text);
+  
+  // Update sidebar branding color
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebar) {
+    sidebar.style.setProperty('--navy', colors.bg, 'important');
+  }
+
+  // Add role badge to sidebar
+  const brand = document.querySelector('.brand-text');
+  if (brand) {
+    let roleBadge = brand.querySelector('.role-badge');
+    if (!roleBadge) {
+      roleBadge = document.createElement('span');
+      roleBadge.className = 'role-badge';
+      brand.appendChild(roleBadge);
+    }
+    roleBadge.textContent = roleLabel;
+    roleBadge.style.fontSize = '8px';
+    roleBadge.style.color = 'rgba(255,255,255,0.4)';
+    roleBadge.style.letterSpacing = '1px';
+    roleBadge.style.textTransform = 'uppercase';
+  }
+}
+
+function saveProfile() {
+  const name = document.getElementById('settingName')?.value?.trim() || '';
+  const role = document.getElementById('settingRole')?.value || 'DO';
+  const division = document.getElementById('settingDivision')?.value || 'DIV1';
+  App.currentUser = { ...App.currentUser, name };
+  App.currentRole = role;
+  App.currentDivision = division;
+  try { 
+    localStorage.setItem('docflow_user', JSON.stringify({ name, role, division })); 
+    localStorage.setItem('ouma_user', JSON.stringify(App.currentUser));
+  } catch(e) {}
+  updateUserDisplay();
+  showToast('Profile saved successfully', 'success');
+}
+
+/**
+ * Logout handler
+ */
+function logout() {
+  if (!confirm('Are you sure you want to logout?')) return;
+  
+  localStorage.removeItem('ouma_user');
+  localStorage.removeItem('docflow_user');
+  
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(() => {
+        window.location.href = '?view=login';
+      })
+      .logoutUser();
+  } else {
+    window.location.href = '?view=login';
+  }
+}
+
+// =====================================================
+// TAB NAVIGATION
+// =====================================================
+const PAGE_TITLES = {
+  dashboard:     'Dashboard',
+  newsubmission: 'New Submission',
+  mysubmissions: 'My Submissions',
+  actionrequired:'Action Required',
+  alldocuments:  'All Submissions',
+  esignature:    'E-Signature Queue',
+  printing:      'Print Queue',
+  outgoing:      'Outgoing Communications',
+  completed:     'Completed Documents',
+  archive:       'Archived Documents',
+  settings:      'Settings'
+};
+
+function switchTab(tabName) {
+  // Remove active from all nav items
+  document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+  // Add active to matching
+  const navItem = document.querySelector(`.nav-item[data-tab="${tabName}"]`);
+  if (navItem) navItem.classList.add('active');
+
+  // Hide all pages
+  document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
+  // Show target
+  const page = document.getElementById('tab-' + tabName);
+  if (page) page.classList.add('active');
+
+  // Update breadcrumb
+  setText('currentPageTitle', PAGE_TITLES[tabName] || tabName);
+  App.currentTab = tabName;
+
+  // Load tab data
+  const loaders = {
+    dashboard:     loadDashboard,
+    mysubmissions: loadMySubmissions,
+    actionrequired:loadActionRequired,
+    alldocuments:  loadAllDocuments,
+    esignature:    loadEsignature,
+    printing:      loadPrinting,
+    outgoing:      loadOutgoing,
+    completed:     loadCompleted,
+    archive:       loadArchive,
+    newsubmission: initNewSubmission
+  };
+  if (loaders[tabName]) loaders[tabName]();
+
+  // Close mobile sidebar
+  document.getElementById('sidebar')?.classList.remove('mobile-open');
+}
+
+function refreshCurrentTab() {
+  switchTab(App.currentTab);
+}
+
+// =====================================================
+// SIDEBAR TOGGLE
+// =====================================================
+function setupSidebarToggle() {
+  document.getElementById('sidebarToggle')?.addEventListener('click', () => {
+    document.getElementById('sidebar')?.classList.toggle('collapsed');
+  });
+}
+
+function setupMobileToggle() {
+  document.getElementById('mobileToggle')?.addEventListener('click', () => {
+    document.getElementById('sidebar')?.classList.toggle('mobile-open');
+  });
+}
+
+function toggleUserMenu() {
+  // Create a simple menu
+  const menu = document.createElement('div');
+  menu.className = 'user-menu-dropdown';
+  menu.style.cssText = `
+    position: absolute;
+    top: 60px;
+    right: 20px;
+    background: white;
+    border: 1px solid #dce2ef;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(15,35,70,0.1);
+    z-index: 1000;
+    min-width: 180px;
+    overflow: hidden;
+  `;
+  menu.innerHTML = `
+    <button onclick="switchTab('settings')" style="width:100%;padding:10px 14px;text-align:left;border:none;background:none;cursor:pointer;font-size:13px;color:#0d1b36;border-bottom:1px solid #edf0f7;">
+      <i class="bi bi-gear"></i> Settings
+    </button>
+    <button onclick="logout()" style="width:100%;padding:10px 14px;text-align:left;border:none;background:none;cursor:pointer;font-size:13px;color:#dc2626;">
+      <i class="bi bi-box-arrow-right"></i> Logout
+    </button>
+  `;
+  
+  document.body.appendChild(menu);
+  
+  setTimeout(() => {
+    document.addEventListener('click', function removeMenu(e) {
+      if (!e.target.closest('.user-menu-btn') && !e.target.closest('.user-menu-dropdown')) {
+        menu.remove();
+        document.removeEventListener('click', removeMenu);
+      }
+    });
+  }, 0);
+}
+
+// =====================================================
+// DASHBOARD
+// =====================================================
+function loadDashboard() {
+  // Set placeholder stats
+  setText('statTotal', App.myDocs.length || '—');
+  setText('statPending', App.myDocs.filter(d => d.status === 'PENDING').length || '—');
+  setText('statApproved', '—');
+  setText('statReleased', '—');
+
+  // Pipeline counts
+  const statuses = ['DRAFT', 'FOR_DIRECTOR', 'FOR_DAS', 'FOR_ASSEC', 'FOR_USEC', 'COMPLETED'];
+  const pipeIds = ['pipeDraft', 'pipeDirector', 'pipeDas', 'pipeAssec', 'pipeUsec', 'pipeReleased'];
+  pipeIds.forEach((id, i) => {
+    setText(id, App.allDocs.filter(d => d.status === statuses[i]).length);
+  });
+
+  renderRecentList();
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(renderDashboardStats)
+      .withFailureHandler(() => {})
+      .getDashboardStats?.();
+  }
+}
+
+function renderDashboardStats(stats) {
+  if (!stats) return;
+  setText('statTotal', stats.totalDocs || '—');
+  setText('statPending', stats.pending || '—');
+  setText('statApproved', stats.approvedToday || '—');
+  setText('statReleased', stats.released || '—');
+}
+
+function renderRecentList() {
+  const container = document.getElementById('recentList');
+  if (!container) return;
+  if (!App.myDocs.length) {
+    container.innerHTML = `<div class="empty-state small"><i class="bi bi-inbox"></i><span>No recent submissions</span></div>`;
+    return;
+  }
+  const recent = App.myDocs.slice(0, 5);
+  container.innerHTML = recent.map(doc => `
+    <div class="recent-item" onclick="openDocumentModal('${esc(doc.id)}')">
+      <span class="recent-item-type doc-type-chip ${getTypeClass(doc.type)}">${esc(doc.type)}</span>
+      <span class="recent-item-title">${esc(doc.subject)}</span>
+      <span class="recent-item-status" style="color:${getStatusColor(doc.status)}">${formatStatus(doc.status)}</span>
+    </div>
+  `).join('');
+}
+
+// =====================================================
+// NEW SUBMISSION
+// =====================================================
+let currentStep = 1;
+
+function initNewSubmission() {
+  // Hide for non-DO and non-ADMIN roles
+  if (!['DO', 'ADMIN', 'DIRECTOR'].includes(App.currentRole)) {
+    switchTab('dashboard');
+    showToast('You do not have permission to create submissions', 'error');
+    return;
+  }
+
+  currentStep = 1;
+  renderStep(1);
+  App.selectedFile = null;
+  App.googleDocLink = '';
+  App.endorseTarget = 'Director';
+  // Reset form
+  ['docType','docAddressee','docSubject','docRemarks','googleDocsLink'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('uploadPreview').style.display = 'none';
+  document.getElementById('uploadZone').style.display = 'block';
+  document.getElementById('attachmentNote').style.display = 'none';
+  setActiveEndorsee('Director');
+}
+
+function renderStep(n) {
+  for (let i = 1; i <= 3; i++) {
+    const stepEl = document.getElementById('step' + i);
+    const indEl = document.getElementById('step' + i + 'Ind');
+    if (stepEl) stepEl.classList.toggle('active', i === n);
+    if (indEl) {
+      indEl.classList.toggle('active', i === n);
+      indEl.classList.toggle('done', i < n);
+    }
+  }
+  currentStep = n;
+  if (n === 3) populateReview();
+}
+
+function goToStep(n) {
+  if (n === 2 && !validateStep1()) return;
+  if (n === 3 && !validateStep2()) return;
+  renderStep(n);
+}
+
+function validateStep1() {
+  const type = document.getElementById('docType')?.value;
+  const addr = document.getElementById('docAddressee')?.value?.trim();
+  const subj = document.getElementById('docSubject')?.value?.trim();
+  if (!type) { showToast('Please select a document type', 'error'); return false; }
+  if (!addr) { showToast('Please enter the addressee', 'error'); return false; }
+  if (!subj) { showToast('Please enter the subject', 'error'); return false; }
+  // Show attachment note for MFS types
+  if (['MFS','MFP'].includes(type)) {
+    document.getElementById('attachmentNote').style.display = 'flex';
+  }
+  return true;
+}
+
+function validateStep2() {
+  const link = document.getElementById('googleDocsLink')?.value?.trim();
+  if (!App.selectedFile && !link) {
+    showToast('Please upload a file or provide a Google Docs link', 'error');
+    return false;
+  }
+  App.googleDocLink = link;
+  return true;
+}
+
+function populateReview() {
+  const type = document.getElementById('docType')?.value || '—';
+  const addr = document.getElementById('docAddressee')?.value || '—';
+  const subj = document.getElementById('docSubject')?.value || '—';
+  const div  = document.getElementById('docDivision')?.value || '—';
+  const prio = document.getElementById('docPriority')?.value || '—';
+  const rem  = document.getElementById('docRemarks')?.value || '—';
+  const divLabels = { DIV1: 'Division I', DIV2: 'Division II', DIV3: 'Division III', DIV4: 'Division IV', ADMIN: 'Admin Division' };
+  const fileName = App.selectedFile ? App.selectedFile.name : (App.googleDocLink ? 'Google Docs Link' : '—');
+  const today = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+  const docId = generateDocName(type, addr, subj);
+
+  document.getElementById('reviewGrid').innerHTML = `
+    <div class="review-item"><span class="rlabel">Document ID</span><span class="rvalue">${esc(docId)}</span></div>
+    <div class="review-item"><span class="rlabel">Date</span><span class="rvalue">${today}</span></div>
+    <div class="review-item"><span class="rlabel">Document Type</span><span class="rvalue">${esc(type)}</span></div>
+    <div class="review-item"><span class="rlabel">Priority</span><span class="rvalue">${esc(prio)}</span></div>
+    <div class="review-item span-2"><span class="rlabel">Addressee</span><span class="rvalue">${esc(addr)}</span></div>
+    <div class="review-item span-2" style="grid-column:span 2"><span class="rlabel">Subject</span><span class="rvalue">${esc(subj)}</span></div>
+    <div class="review-item"><span class="rlabel">Division</span><span class="rvalue">${esc(divLabels[div] || div)}</span></div>
+    <div class="review-item"><span class="rlabel">File</span><span class="rvalue">${esc(fileName)}</span></div>
+    <div class="review-item span-2" style="grid-column:span 2"><span class="rlabel">Remarks</span><span class="rvalue">${esc(rem)}</span></div>
+  `;
+}
+
+function generateDocName(type, addr, subj) {
+  const d = new Date();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const yyyy = d.getFullYear();
+  const addrShort = addr.split(/\s+/).slice(0,3).join('_').replace(/[^a-zA-Z_]/g,'');
+  const subjShort = subj.split(/\s+/).slice(0,4).join('_').replace(/[^a-zA-Z_0-9]/g,'');
+  return `${mm}${dd}${yyyy}_${type}_${addrShort}_${subjShort}`;
+}
+
+function selectEndorsee(target) {
+  App.endorseTarget = target;
+  setActiveEndorsee(target);
+}
+
+function setActiveEndorsee(target) {
+  ['Director','DAS','AsSec','USec'].forEach(t => {
+    const btn = document.getElementById('end' + t.replace(' ',''));
+    if (btn) btn.classList.toggle('active', t === target);
+  });
+}
+
+function saveDraftOnly() {
+  saveDocument('DRAFT');
+}
+
+function submitDocument() {
+  saveDocument('SUBMIT');
+}
+
+function saveDocument(mode) {
+  const type   = document.getElementById('docType')?.value || '';
+  const addr   = document.getElementById('docAddressee')?.value?.trim() || '';
+  const subj   = document.getElementById('docSubject')?.value?.trim() || '';
+  const div    = document.getElementById('docDivision')?.value || 'DIV1';
+  const prio   = document.getElementById('docPriority')?.value || 'ROUTINE';
+  const rem    = document.getElementById('docRemarks')?.value?.trim() || '';
+  const link   = document.getElementById('googleDocsLink')?.value?.trim() || '';
+
+  const doc = {
+    id:          'DOC-' + Date.now(),
+    docId:       generateDocName(type, addr, subj),
+    type, addr, subject: subj, division: div,
+    priority: prio, remarks: rem,
+    fileLink:    link || (App.selectedFile ? '[uploaded]' : ''),
+    submittedBy: App.currentUser?.name || 'Officer',
+    division:    div,
+    status:      mode === 'DRAFT' ? 'DRAFT' : 'FOR_' + App.endorseTarget.toUpperCase().replace(' ','_'),
+    endorseTo:   App.endorseTarget,
+    createdAt:   new Date().toISOString(),
+    versions:    [{ label: 'v1 — Initial Draft', by: App.currentUser?.name, date: new Date().toISOString() }],
+    comments:    [],
+    trail:       [{ step: 'Submitted', by: App.currentUser?.name, date: new Date().toISOString(), status: 'done' }]
+  };
+
+  App.myDocs.unshift(doc);
+  App.allDocs.unshift(doc);
+
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(res => {
+        if (res && res.success) showToast(mode === 'DRAFT' ? 'Draft saved!' : 'Document submitted!', 'success');
+        else showToast('Saved locally', 'success');
+      })
+      .withFailureHandler(() => showToast(mode === 'DRAFT' ? 'Draft saved locally' : 'Document submitted locally', 'success'))
+      .saveDocument?.(doc);
+  } else {
+    showToast(mode === 'DRAFT' ? 'Draft saved!' : `Document submitted to ${App.endorseTarget}!`, 'success');
+  }
+
+  setTimeout(() => switchTab('mysubmissions'), 800);
+}
+
+// FILE UPLOAD
+function triggerFileInput() { document.getElementById('fileInput')?.click(); }
+
+function handleFileSelect(event) {
+  const file = event.target.files[0];
+  if (file) showFilePreview(file);
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone')?.classList.add('dragover');
+}
+
+function handleDragLeave(e) {
+  document.getElementById('uploadZone')?.classList.remove('dragover');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone')?.classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) showFilePreview(file);
+}
+
+function showFilePreview(file) {
+  App.selectedFile = file;
+  document.getElementById('uploadZone').style.display = 'none';
+  document.getElementById('uploadPreview').style.display = 'flex';
+  setText('previewFileName', file.name);
+  setText('previewFileSize', formatFileSize(file.size));
+}
+
+function removeFile() {
+  App.selectedFile = null;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('uploadZone').style.display = 'block';
+  document.getElementById('uploadPreview').style.display = 'none';
+}
+
+function verifyGoogleLink() {
+  const link = document.getElementById('googleDocsLink')?.value?.trim();
+  if (!link) { showToast('Please enter a Google Docs URL', 'error'); return; }
+  if (!link.includes('docs.google.com') && !link.includes('drive.google.com')) {
+    showToast('Please enter a valid Google Docs or Drive URL', 'error'); return;
+  }
+  showToast('Link verified ✓', 'success');
+}
+
+// =====================================================
+// MY SUBMISSIONS
+// =====================================================
+function loadMySubmissions() {
+  renderMyDocs(App.myDocs);
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(docs => { App.myDocs = docs || []; renderMyDocs(App.myDocs); })
+      .withFailureHandler(() => {})
+      .getMyDocuments?.();
+  }
+}
+
+function renderMyDocs(docs) {
+  const container = document.getElementById('myDocsList');
+  if (!container) return;
+  const filter = App.filters.myDocs;
+  const q = (App.searchQueries.myDocs || '').toLowerCase();
+  let filtered = docs;
+  if (filter !== 'ALL') filtered = filtered.filter(d => matchStatus(d.status, filter));
+  if (q) filtered = filtered.filter(d => (d.subject + d.type + d.addr).toLowerCase().includes(q));
+
+  if (!filtered.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i class="bi bi-file-earmark-plus"></i>
+        <h3>${docs.length ? 'No documents match your filter' : 'No submissions yet'}</h3>
+        <p>${docs.length ? 'Try a different filter or search term' : 'Start by creating your first document submission'}</p>
+        <button class="btn btn-primary" onclick="switchTab('newsubmission')"><i class="bi bi-plus-lg"></i> New Submission</button>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(doc => `
+    <div class="doc-item ${doc.priority === 'URGENT' ? 'urgent-item' : ''}" onclick="openDocumentModal('${esc(doc.id)}')">
+      <div class="doc-item-left">
+        <div class="doc-type-chip ${getTypeClass(doc.type)}">${esc(doc.type)}</div>
+        <div class="doc-item-info">
+          <span class="doc-item-title">${esc(doc.subject)}</span>
+          <span class="doc-item-meta">
+            <i class="bi bi-arrow-right-circle"></i> ${esc(doc.endorseTo || '—')} &nbsp;·&nbsp;
+            <i class="bi bi-clock"></i> ${formatDate(doc.createdAt)}
+            ${doc.priority === 'URGENT' ? '<span style="color:var(--red);font-weight:700;margin-left:6px;">⚡ URGENT</span>' : ''}
+          </span>
+        </div>
+      </div>
+      <div class="doc-item-right">
+        <span class="status-pill ${getStatusPillClass(doc.status)}">${formatStatus(doc.status)}</span>
+        <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();openDocumentModal('${esc(doc.id)}')">
+          <i class="bi bi-eye"></i> View
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterMyDocs(status, btn) {
+  App.filters.myDocs = status;
+  document.querySelectorAll('#tab-mysubmissions .filter-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderMyDocs(App.myDocs);
+}
+
+function searchMyDocs(q) {
+  App.searchQueries.myDocs = q;
+  renderMyDocs(App.myDocs);
+}
+
+// =====================================================
+// ACTION REQUIRED
+// =====================================================
+function loadActionRequired() {
+  // Items that need the current user's action
+  const actionDocs = App.allDocs.filter(d => isActionRequired(d));
+  renderActionList(actionDocs);
+}
+
+function isActionRequired(doc) {
+  const role = App.currentRole;
+  const statusMap = {
+    DIRECTOR: 'FOR_DIRECTOR',
+    DAS:      'FOR_DAS',
+    ASSEC:    'FOR_ASSEC',
+    USEC:     'FOR_USEC',
+    SECRETARY:'FOR_SIGNATURE'
+  };
+  return doc.status === (statusMap[role] || null);
+}
+
+function renderActionList(docs) {
+  const container = document.getElementById('actionList');
+  if (!container) return;
+  // Keep the sample items if no real docs
+  if (docs.length) {
+    container.innerHTML = docs.map(doc => `
+      <div class="doc-item urgent-item" onclick="openDocumentModal('${esc(doc.id)}')">
+        <div class="doc-item-left">
+          <div class="doc-type-chip ${getTypeClass(doc.type)}">${esc(doc.type)}</div>
+          <div class="doc-item-info">
+            <span class="doc-item-title">${esc(doc.subject)}</span>
+            <span class="doc-item-meta"><i class="bi bi-person"></i> ${esc(doc.submittedBy)} &nbsp;·&nbsp; <i class="bi bi-clock"></i> ${formatDate(doc.createdAt)}</span>
+          </div>
+        </div>
+        <div class="doc-item-right">
+          <span class="status-pill urgent">${formatStatus(doc.status)}</span>
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openDocumentModal('${esc(doc.id)}')"><i class="bi bi-eye"></i> Review</button>
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+function filterActions(type, btn) {
+  App.filters.actions = type;
+  document.querySelectorAll('#tab-actionrequired .filter-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function searchActions(q) { App.searchQueries.actions = q; }
+
+// =====================================================
+// ALL DOCUMENTS
+// =====================================================
+function loadAllDocuments() {
+  renderAllDocsTable(App.allDocs);
+  if (typeof google !== 'undefined') {
+    google.script.run
+      .withSuccessHandler(docs => { App.allDocs = docs || []; renderAllDocsTable(App.allDocs); })
+      .withFailureHandler(() => {})
+      .getAllDocuments?.();
+  }
+}
+
+function renderAllDocsTable(docs) {
+  const tbody = document.getElementById('allDocsTbody');
+  if (!tbody) return;
+  const divFilter = App.filters.division;
+  const statusFilter = App.filters.allDocs;
+  const q = (App.searchQueries.allDocs || '').toLowerCase();
+
+  let filtered = docs;
+  if (divFilter !== 'ALL') filtered = filtered.filter(d => d.division === divFilter);
+  if (statusFilter !== 'ALL') filtered = filtered.filter(d => matchStatus(d.status, statusFilter));
+  if (q) filtered = filtered.filter(d => (d.subject + d.type + d.submittedBy + d.addr).toLowerCase().includes(q));
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty"><div class="empty-state small"><i class="bi bi-inbox"></i><span>No documents found</span></div></td></tr>`;
+    return;
+  }
+
+  const divLabels = { DIV1: 'Division I', DIV2: 'Division II', DIV3: 'Division III', DIV4: 'Division IV', ADMIN: 'Admin' };
+
+  tbody.innerHTML = filtered.map(doc => `
+    <tr onclick="openDocumentModal('${esc(doc.id)}')">
+      <td>
+        <div style="font-weight:600;font-size:12px;color:var(--text-1);margin-bottom:2px;">${esc(doc.subject)}</div>
+        <div style="font-size:10px;color:var(--text-3);">${esc(doc.docId || doc.id)}</div>
+      </td>
+      <td><span class="doc-type-chip ${getTypeClass(doc.type)}">${esc(doc.type)}</span></td>
+      <td>${esc(divLabels[doc.division] || doc.division)}</td>
+      <td>${esc(doc.submittedBy)}</td>
+      <td><span class="status-pill ${getStatusPillClass(doc.status)}">${formatStatus(doc.status)}</span></td>
+      <td style="font-size:11px;color:var(--text-3);">${formatDate(doc.createdAt)}</td>
+      <td>
+        <button class="btn btn-sm btn-outline" onclick="event.stopPropagation();openDocumentModal('${esc(doc.id)}')"><i class="bi bi-eye"></i></button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterByDivision(div, btn) {
+  App.filters.division = div;
+  document.querySelectorAll('.div-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAllDocsTable(App.allDocs);
+}
+
+function filterAllDocs(status, btn) {
+  App.filters.allDocs = status;
+  document.querySelectorAll('#tab-alldocuments .filter-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAllDocsTable(App.allDocs);
+}
+
+function searchAllDocs(q) {
+  App.searchQueries.allDocs = q;
+  renderAllDocsTable(App.allDocs);
+}
+
+function exportDocs() { showToast('Export feature — connect to server to enable', 'info'); }
+
+// =====================================================
+// OTHER TABS
+// =====================================================
+function loadEsignature() {
+  const esigDocs = App.allDocs.filter(d => d.status === 'FOR_SIGNATURE');
+  const container = document.getElementById('esigList');
+  if (!container) return;
+  if (!esigDocs.length) {
+    container.innerHTML = `<div class="empty-state"><i class="bi bi-pen"></i><h3>No documents for signature</h3><p>Documents approved by AsSec or USec will appear here</p></div>`;
+    return;
+  }
+  container.innerHTML = esigDocs.map(doc => `
+    <div class="doc-item">
+      <div class="doc-item-left">
+        <div class="doc-type-chip ${getTypeClass(doc.type)}">${esc(doc.type)}</div>
+        <div class="doc-item-info">
+          <span class="doc-item-title">${esc(doc.subject)}</span>
+          <span class="doc-item-meta">From ${esc(doc.submittedBy)} · ${formatDate(doc.createdAt)}</span>
+        </div>
+      </div>
+      <div class="doc-item-right">
+        <button class="btn btn-primary btn-sm" onclick="signDocument('${esc(doc.id)}')"><i class="bi bi-pen"></i> Sign</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function signDocument(docId) {
+  const doc = findDoc(docId);
+  if (!doc) return;
+  doc.status = 'FOR_PRINTING';
+  showToast('Document signed and sent to printing queue', 'success');
+  loadEsignature();
+}
+
+function loadPrinting() {
+  const printDocs = App.allDocs.filter(d => d.status === 'FOR_PRINTING');
+  const container = document.getElementById('printGrid');
+  if (!container) return;
+  if (!printDocs.length) {
+    container.innerHTML = `<div class="empty-state"><i class="bi bi-printer"></i><h3>Print queue is empty</h3><p>Documents cleared for printing will appear here</p></div>`;
+    return;
+  }
+  container.innerHTML = printDocs.map(doc => `
+    <div class="doc-item">
+      <div class="doc-item-left">
+        <div class="doc-type-chip ${getTypeClass(doc.type)}">${esc(doc.type)}</div>
+        <div class="doc-item-info">
+          <span class="doc-item-title">${esc(doc.subject)}</span>
+        </div>
+      </div>
+      <div class="doc-item-right" style="gap:6px;">
+        <button class="btn btn-sm btn-outline" onclick="generateCleanCopyFor('${esc(doc.id)}')"><i class="bi bi-file-earmark-text"></i> Clean Copy</button>
+        <button class="btn btn-sm btn-ghost" onclick="generateApprovalCopyFor('${esc(doc.id)}')"><i class="bi bi-file-earmark-ruled"></i> With Trail</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function loadOutgoing() {
+  const outDocs = App.allDocs.filter(d => d.status === 'FOR_OUTGOING');
+  const container = document.getElementById('outgoingList');
+  if (!container) return;
+  if (!outDocs.length) {
+    container.innerHTML = `<div class="empty-state"><i class="bi bi-send"></i><h3>No outgoing documents</h3><p>Signed and printed documents will appear here for final release</p></div>`;
+    return;
+  }
+  container.innerHTML = outDocs.map(doc => `
+    <div class="doc-item">
+      <div class="doc-item-left">
+        <div class="doc-type-chip ${getTypeClass(doc.type)}">${esc(doc.type)}</div>
+        <div class="doc-item-info"><span class="doc-item-title">${esc(doc.subject)}</span></div>
+      </div>
+      <div class="doc-item-right">
+        <button class="btn btn-primary btn-sm" onclick="releaseDocument('${esc(doc.id)}')"><i class="bi bi-send"></i> Release</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function releaseDocument(docId) {
+  const doc = findDoc(docId);
+  if (doc) { doc.status = 'COMPLETED'; }
+  showToast('Document released and marked as completed', 'success');
+  loadOutgoing();
+}
+
+function loadCompleted() {
+  const completedDocs = App.allDocs.filter(d => d.status === 'COMPLETED');
+  const tbody = document.getElementById('completedTbody');
+  if (!tbody) return;
+  if (!completedDocs.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="table-empty"><div class="empty-state small"><i class="bi bi-archive"></i><span>No completed documents</span></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = completedDocs.map(doc => `
+    <tr>
+      <td>
+        <div style="font-weight:600;font-size:12px;">${esc(doc.subject)}</div>
+        <div style="font-size:10px;color:var(--text-3);">${esc(doc.docId || doc.id)}</div>
+      </td>
+      <td><span class="doc-type-chip ${getTypeClass(doc.type)}">${esc(doc.type)}</span></td>
+      <td>${esc(doc.submittedBy)}</td>
+      <td style="font-size:11px;">${formatDate(doc.createdAt)}</td>
+      <td><button class="btn btn-sm btn-outline" onclick="openDocumentModal('${esc(doc.id)}')"><i class="bi bi-eye"></i></button></td>
+    </tr>
+  `).join('');
+}
+
+
+function loadArchive() {
+  const archivedDocs = App.allDocs.filter(d => d.status === 'DELETED');
+  const tbody = document.getElementById('deletedTbody');
+  if (!tbody) return;
+  if (!archivedDocs.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="table-empty"><div class="empty-state small"><i class="bi bi-archive"></i><span>No archived documents</span></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = archivedDocs.map(doc => `
+    <tr>
+      <td>
+        <div style="font-weight:600;font-size:12px;">${esc(doc.subject)}</div>
+        <div style="font-size:10px;color:var(--text-3);">${esc(doc.docId || doc.id)}</div>
+      </td>
+      <td><span class="doc-type-chip ${getTypeClass(doc.type)}">${esc(doc.type)}</span></td>
+      <td>${esc(doc.submittedBy)}</td>
+      <td style="font-size:11px;">${formatDate(doc.createdAt)}</td>
+      <td><button class="btn btn-sm btn-outline" onclick="openDocumentModal('${esc(doc.id)}')"><i class="bi bi-eye"></i></button></td>
+    </tr>
+  `).join('');
+}
+
+// =====================================================
+// DOCUMENT MODAL
+// =====================================================
+function openDocumentModal(docId) {
+  let doc = findDoc(docId);
+  // Demo: create mock if docId is sample
+  if (!doc && docId === 'sample1') {
+    doc = { id: 'sample1', type: 'MEMO', subject: 'Memorandum on Policy Update', submittedBy: 'Cruz, Ma. R.', createdAt: new Date().toISOString(), status: 'FOR_DIRECTOR', versions: [{ label: 'v1 — Initial Draft', by: 'Cruz, Ma. R.', date: new Date().toISOString() }], comments: [{ author: 'Director Santos', avatar: 'D', text: 'Please revise Section 3 to align with the latest policy directive.', time: '2 hours ago' }] };
+  }
+  if (!doc && docId === 'sample2') {
+    doc = { id: 'sample2', type: 'LTR', subject: 'Letter of Endorsement for OFW Program', submittedBy: 'Santos, J.', createdAt: new Date().toISOString(), status: 'FOR_DAS', versions: [{ label: 'v1 — Initial Draft', by: 'Santos, J.', date: new Date().toISOString() }], comments: [] };
+  }
+  if (!doc) { showToast('Document not found', 'error'); return; }
+
+  App.currentDocId = docId;
+  setText('modalDocType', doc.type);
+  const chip = document.getElementById('modalDocType');
+  if (chip) { chip.className = 'doc-type-chip ' + getTypeClass(doc.type); chip.textContent = doc.type; }
+  setText('modalDocTitle', doc.subject);
+  setText('modalDocMeta', `Submitted by ${doc.submittedBy} · ${formatDate(doc.createdAt)}`);
+
+  // Version history
+  const vl = document.getElementById('versionList');
+  if (vl && doc.versions) {
+    vl.innerHTML = doc.versions.map((v, i) => `
+      <div class="version-item ${i === doc.versions.length - 1 ? 'current' : ''}">
+        <div class="version-dot"></div>
+        <div class="version-info">
+          <span class="version-label">${esc(v.label)}</span>
+          <span class="version-meta">By ${esc(v.by || '—')} · ${formatDate(v.date)}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Comments
+  renderComments(doc.comments || []);
+
+  // Update permission-based panels
+  updateDocumentModalPermissions();
+
+  document.getElementById('docModal').style.display = 'flex';
+}
+
+function renderComments(comments) {
+  const container = document.getElementById('commentList');
+  if (!container) return;
+  if (!comments.length) {
+    container.innerHTML = `<div style="font-size:12px;color:var(--text-3);padding:4px 0;">No comments yet.</div>`;
+    return;
+  }
+  container.innerHTML = comments.map(c => `
+    <div class="comment-item">
+      <div class="comment-avatar">${esc(c.avatar || (c.author || 'U')[0])}</div>
+      <div class="comment-body">
+        <span class="comment-author">${esc(c.author)}</span>
+        <span class="comment-time">${esc(c.time || formatDate(c.date))}</span>
+        <p class="comment-text">${esc(c.text)}</p>
+      </div>
+    </div>
+  `).join('');
+}
+
+function addComment() {
+  const input = document.getElementById('newComment');
+  const text = input?.value?.trim();
+  if (!text) return;
+  const doc = findDoc(App.currentDocId);
+  if (!doc) return;
+  if (!doc.comments) doc.comments = [];
+  const comment = { author: App.currentUser?.name || 'You', avatar: (App.currentUser?.name || 'U')[0], text, time: 'Just now', date: new Date().toISOString() };
+  doc.comments.push(comment);
+  renderComments(doc.comments);
+  input.value = '';
+  showToast('Comment added', 'success');
+}
+
+function closeDocModal(e) {
+  if (!e || e.target === document.getElementById('docModal') || !e.target) {
+    document.getElementById('docModal').style.display = 'none';
+    App.currentDocId = null;
+  }
+}
+
+// COLLAPSIBLES
+function toggleCollapse(id) {
+  const body = document.getElementById(id);
+  const arrow = document.getElementById(id + 'Arrow');
+  if (!body) return;
+  body.classList.toggle('show');
+  if (arrow) arrow.classList.toggle('open');
+}
+
+// DOCUMENT ACTIONS
+function openFile() { showToast('Opening document... (connect file link)', 'info'); }
+function uploadNewVersion() { showToast('Version upload — connect file upload handler', 'info'); }
+
+function flagDoc(flag) {
+  const doc = findDoc(App.currentDocId);
+  if (!doc) return;
+  if (flag === 'DISCUSSION') { doc.flag = 'FOR_DISCUSSION'; showToast('Document flagged: For Discussion', 'info'); }
+  if (flag === 'NOT_FOR_APPROVAL') { doc.flag = 'NOT_FOR_APPROVAL'; showToast('Document flagged: Not for Approval', 'warning'); }
+}
+
+function endorse(target) {
+  const doc = findDoc(App.currentDocId);
+  if (!doc) return;
+  const statusMap = { Director: 'FOR_DIRECTOR', DAS: 'FOR_DAS', AsSec: 'FOR_ASSEC', USec: 'FOR_USEC' };
+  doc.status = statusMap[target] || doc.status;
+  doc.trail = doc.trail || [];
+  doc.trail.push({ step: `Forwarded to ${target}`, by: App.currentUser?.name || 'User', date: new Date().toISOString(), status: 'done' });
+  showToast(`Document endorsed to ${target}`, 'success');
+  closeDocModal();
+  refreshCurrentTab();
+}
+
+function approveDoc() {
+  const doc = findDoc(App.currentDocId);
+  if (!doc) return;
+  const nextStatus = { FOR_DIRECTOR: 'FOR_DAS', FOR_DAS: 'FOR_ASSEC', FOR_ASSEC: 'FOR_USEC', FOR_USEC: 'FOR_SIGNATURE' };
+  doc.status = nextStatus[doc.status] || doc.status;
+  doc.trail = doc.trail || [];
+  doc.trail.push({ step: 'Approved', by: App.currentUser?.name || 'User', date: new Date().toISOString(), status: 'done' });
+  showToast('Document approved and forwarded', 'success');
+  closeDocModal();
+  refreshCurrentTab();
+}
+
+function returnDoc() {
+  const text = prompt('Enter reason for returning this document:');
+  if (!text) return;
+  const doc = findDoc(App.currentDocId);
+  if (!doc) return;
+  doc.status = 'RETURNED';
+  if (!doc.comments) doc.comments = [];
+  doc.comments.push({ author: App.currentUser?.name || 'Reviewer', avatar: (App.currentUser?.name || 'R')[0], text: `Returned: ${text}`, time: 'Just now', date: new Date().toISOString() });
+  showToast('Document returned with comment', 'warning');
+  closeDocModal();
+  refreshCurrentTab();
+}
+
+function generateCleanCopy()     { showToast('Generating clean copy... (PDF generation)', 'success'); }
+function generateApprovalCopy()  { showToast('Generating copy with approval trail... (PDF generation)', 'success'); }
+function generateCleanCopyFor(id) { showToast('Generating clean copy...', 'success'); }
+function generateApprovalCopyFor(id) { showToast('Generating approval trail copy...', 'success'); }
+
+function sendToEsig() {
+  const doc = findDoc(App.currentDocId);
+  if (doc) { doc.status = 'FOR_SIGNATURE'; showToast('Sent to E-Signature queue', 'success'); closeDocModal(); }
+}
+
+function sendToPrinting() {
+  const doc = findDoc(App.currentDocId);
+  if (doc) { doc.status = 'FOR_PRINTING'; showToast('Sent to Print queue', 'success'); closeDocModal(); }
+}
+
+function sendToOutgoing() {
+  const doc = findDoc(App.currentDocId);
+  if (doc) { doc.status = 'FOR_OUTGOING'; showToast('Sent to Outgoing Communications', 'success'); closeDocModal(); }
+}
+
+// =====================================================
+// NOTIFICATIONS
+// =====================================================
+function clearNotifications() {
+  const notifList = document.getElementById('notifList');
+  if (notifList) notifList.innerHTML = `<div style="font-size:12px;color:var(--text-3);padding:12px;">No notifications</div>`;
+}
+
+// =====================================================
+// TOAST SYSTEM
+// =====================================================
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  const icons = { success: 'bi-check-circle-fill', error: 'bi-x-circle-fill', warning: 'bi-exclamation-triangle-fill', info: 'bi-info-circle-fill' };
+  toast.innerHTML = `<i class="bi ${icons[type] || icons.info}"></i> ${esc(message)}`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.animation = 'toastOut 0.3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// =====================================================
+// HELPERS
+// =====================================================
+function el(id) { return document.getElementById(id); }
+function setText(id, text) { const e = document.getElementById(id); if (e) e.textContent = text; }
+function esc(str) {
+  if (!str) return '';
+  const d = document.createElement('div');
+  d.textContent = String(str);
+  return d.innerHTML;
+}
+
+function findDoc(id) {
+  return App.myDocs.find(d => d.id === id) || App.allDocs.find(d => d.id === id);
+}
+
+function matchStatus(docStatus, filter) {
+  const map = {
+    'DRAFT':       ['DRAFT'],
+    'PENDING':     ['FOR_DIRECTOR','FOR_DAS','FOR_ASSEC','FOR_USEC','FOR_SIGNATURE'],
+    'APPROVED':    ['FOR_PRINTING','FOR_OUTGOING'],
+    'RETURNED':    ['RETURNED'],
+    'COMPLETED':   ['COMPLETED'],
+    'FOR_DIRECTOR':['FOR_DIRECTOR'],
+    'FOR_DAS':     ['FOR_DAS'],
+    'FOR_ASSEC':   ['FOR_ASSEC'],
+    'FOR_USEC':    ['FOR_USEC'],
+    'FOR_SIGNATURE':['FOR_SIGNATURE']
+  };
+  return (map[filter] || []).includes(docStatus);
+}
+
+function formatStatus(status) {
+  const labels = {
+    DRAFT:          'Draft',
+    FOR_DIRECTOR:   'For Director',
+    FOR_DAS:        'For DAS',
+    FOR_ASSEC:      'For AsSec',
+    FOR_USEC:       'For USec',
+    FOR_SIGNATURE:  'For Signature',
+    FOR_PRINTING:   'For Printing',
+    FOR_OUTGOING:   'For Outgoing',
+    RETURNED:       'Returned',
+    COMPLETED:      'Completed'
+  };
+  return labels[status] || status;
+}
+
+function getStatusPillClass(status) {
+  if (!status) return 'draft';
+  if (status === 'DRAFT') return 'draft';
+  if (status === 'RETURNED') return 'returned';
+  if (status === 'COMPLETED') return 'completed';
+  if (status === 'FOR_SIGNATURE') return 'signature';
+  if (status.startsWith('FOR_')) return 'pending';
+  return 'draft';
+}
+
+function getStatusColor(status) {
+  const colors = { DRAFT: 'var(--text-3)', RETURNED: 'var(--red)', COMPLETED: 'var(--blue)' };
+  return colors[status] || 'var(--orange)';
+}
+
+function getTypeClass(type) {
+  const map = { MEMO: 'memo', LTR: 'ltr', CIR: 'cir', RPT: 'rpt', MFS: 'mfs', MFP: 'mfs', DAO: 'cir', DM: 'memo' };
+  return map[type] || 'other';
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d)) return String(dateStr);
+    const now = new Date();
+    const diff = Math.floor((now - d) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + ' hr ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + ' days ago';
+    return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch(e) { return String(dateStr); }
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return '—';
+  const n = Number(bytes);
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1048576).toFixed(1) + ' MB';
+}
+</script>
